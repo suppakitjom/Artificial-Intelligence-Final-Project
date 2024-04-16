@@ -4,41 +4,58 @@ from collections import deque
 import math
 from controller import Supervisor
 
-random.seed(0)
+# random.seed(0)
 player_dict = {0:'X', 1:'Y'}
-supervisor = Supervisor()
-timestep = int(supervisor.getBasicTimeStep())
-arena = supervisor.getFromDef('arena')
-floor_size = arena.getField('floorSize').getSFVec2f()
 
-def get_x_y(row,column):
-    x_offset = 0.35
-    y_offset = -0.35
-    tile_size = 0.1
+class Sim(Supervisor):
+    def __init__(self):
+        self.game = Supervisor()
+        self.timestep = int(self.game.getBasicTimeStep())
+        self.arena = self.game.getFromDef('arena')
 
-    center_x = -floor_size[0] / 2 + x_offset
-    center_y = -floor_size[1] / 2 + y_offset
-    x = center_x + (column + 0.5) * tile_size
-    y = center_y + (7 - row + 0.5) * tile_size
-    return x,y
+    def get_x_y(self,row,column):
+        x_offset = 0.35
+        y_offset = -0.35
+        tile_size = 0.1
+        floor_size = self.arena.getField('floorSize').getSFVec2f()
 
-def create_coin(supervisor, row, column):
-    x, y = get_x_y(row=row,column=column)  # Assume get_x_y is a function that calculates positions based on grid indices
-    # Create a unique DEF and name for each coin
-    coin_def = f"coin_{row}_{column}"
+        center_x = -floor_size[0] / 2 + x_offset
+        center_y = -floor_size[1] / 2 + y_offset
+        x = center_x + (column + 0.5) * tile_size
+        y = center_y + (7 - row + 0.5) * tile_size
+        return x,y
 
-    # Adjust the coin position and name for a different orientation or logic
-    coin_def_string = f'DEF {coin_def} Coin {{ translation {x} {y} 0.025 name "{coin_def}" }}'
-    root_node = supervisor.getRoot()
-    children_field = root_node.getField('children')
-    children_field.importMFNodeFromString(-1, coin_def_string)
+    def create_coin(self,row,column):
+        x, y = self.get_x_y(row=row,column=column)
+        coin_def = f"coin_{row}_{column}"
+        coin_def_string = f'DEF {coin_def} Coin {{ translation {x} {y} 0.025 name "{coin_def}" }}'
+        root_node = self.game.getRoot()
+        children_field = root_node.getField('children')
+        children_field.importMFNodeFromString(-1, coin_def_string)
 
+    def remove_coin(self,row,column):
+        coin_name = f"coin_{row}_{column}"
+        print(f"Removing coin {coin_name}")
+        coin_node = self.game.getFromDef(coin_name)
+        coin_node.remove()
 
-def remove_coin(supervisor, row, column):
-    coin_name = f"coin_{row}_{column}"
-    print(f"Removing coin {coin_name}")
-    coin_node = supervisor.getFromDef(coin_name)
-    coin_node.remove()
+    def move_robot(self,robot_def,row,column,direction):
+        rotation = {'left':math.pi, 'right':0, 'up':math.pi/2, 'down':-math.pi/2}
+        robot = self.game.getFromDef(robot_def)
+        x, y = self.get_x_y(row=row,column=column)
+        # turn the robot to the correct direction
+        rotation_field = robot.getField('rotation')
+        rotation_field.setSFRotation([0, 0, 1, rotation[direction]])
+
+        translation_field = robot.getField('translation')
+        current_position = translation_field.getSFVec3f()
+        target_position = [x, y, 0]
+        num_iterations = 15
+        step_size = [(target_position[i] - current_position[i]) / num_iterations for i in range(3)]
+        for _ in range(num_iterations):
+            current_position = [current_position[i] + step_size[i] for i in range(3)]
+            translation_field.setSFVec3f(current_position)
+            self.game.step(self.timestep)
 
 class GameBoard:
     '''
@@ -206,6 +223,7 @@ class Game:
         '''
         self.board = GameBoard()
         self.players = [Player((0, 0)), Player((7, 7))]
+        self.sim = Sim()
         self.rounds = 0
         print("Initial Board:")
         self.board.print_board()
@@ -213,7 +231,7 @@ class Game:
         for row in range(self.board.size):
             for col in range(self.board.size):
                 if self.board.board[row, col] == 1:
-                    create_coin(supervisor, row, col)
+                    self.sim.create_coin(row=row,column=col)
     
 
     
@@ -230,7 +248,7 @@ class Game:
             if self.board.board[row, col] == 1:
                 player.score += 1
                 self.board.board[row, col] = 0
-                remove_coin(supervisor, row = row, column= col)
+                self.sim.remove_coin(row=row,column=col)
 
         print("Game Start!")
         self.board.print_board(self.players)
@@ -242,11 +260,12 @@ class Game:
             selected_move = player.move(self.board, self.players)
 
             row, col = player.position
+            self.sim.move_robot(robot_def=f"player{player_index+1}",row=row,column=col,direction=move_dict[selected_move])
             if self.board.board[row, col] == 1:
                 player.score += 1
                 player.consecutive_coins += 1
                 self.board.board[row, col] = 0
-                remove_coin(supervisor, row=row, column=col)
+                self.sim.remove_coin(row=row,column=col)
 
                 if player.consecutive_coins >=3: # Take in account the current coin streak and apply bonus accordingly
                     bonus = player.consecutive_coins ** 2
@@ -257,9 +276,10 @@ class Game:
             print(f"Player {player_dict[player_index]} moved {move_dict[selected_move]}",f"({player.consecutive_coins} consecutive coin(s))" if player.consecutive_coins else "")
             self.board.print_board(self.players)
 
+
             player_index = 1 - player_index # Alternate between players
             self.rounds += 1
-            supervisor.step(timestep)
+            self.sim.game.step(self.sim.timestep)
 
         self.summarize_game()
 
