@@ -1,0 +1,48 @@
+#VRML_SIM R2023b utf8
+
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackground.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/backgrounds/protos/TexturedBackgroundLight.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/objects/floors/protos/RectangleArena.proto"
+EXTERNPROTO "https://raw.githubusercontent.com/cyberbotics/webots/R2023b/projects/robots/gctronic/e-puck/protos/E-puck.proto"
+IMPORTABLE EXTERNPROTO "../protos/Coin.proto"
+
+WorldInfo {
+}
+Viewpoint {
+  orientation -0.5656460705147887 0.5996368190992444 0.5661097138291469 2.0598196336697936
+  position 0.0004914540579111142 0.0007796816047980878 2.2598702425014614
+}
+TexturedBackground {
+}
+TexturedBackgroundLight {
+}
+DEF arena RectangleArena {
+  translation 0.35 -0.35 0
+  floorSize 0.8 0.8
+  floorTileSize 0.2 0.2
+  wallHeight 0.05
+}
+DEF player1 E-puck {
+  hidden position_0_0 -3.101013123678651e-08
+  hidden position_0_1 -3.101010643152756e-08
+  hidden rotation_1 0 -1 0 2.9802322387695313e-08
+  hidden rotation_2 0 -1 0 2.9802322387695313e-08
+  translation -9.967393997289839e-11 1.7762100821891603e-11 -6.396194889244332e-05
+  rotation 0.7475296991741754 0.6642283860356938 6.08147186869003e-06 3.4241567716649568e-09
+  name "player1"
+  controller "<none>"
+}
+DEF player2 E-puck {
+  hidden position_0_0 -3.1010093159977714e-08
+  hidden position_0_1 3.101014490891067e-08
+  hidden rotation_1 0 -1 0 2.9802322387695313e-08
+  hidden rotation_2 0 0.9999999999999999 0 2.9802322387695313e-08
+  translation 0.7000000000000002 -0.700000000017761 -6.396194889219525e-05
+  rotation 1.7682167427928392e-12 1.2798275702856106e-09 1 -3.1415926498666793
+  name "player2"
+  controller "<none>"
+}
+Robot {
+  controller "my_controller"
+  supervisor TRUE
+}

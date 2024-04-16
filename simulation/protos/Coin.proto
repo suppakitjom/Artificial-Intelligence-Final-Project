@@ -1,0 +1,30 @@
+#VRML_SIM R2022b utf8
+PROTO Coin [
+  field SFVec3f translation 0 0 0.025
+  field SFRotation rotation 0 1 0 0
+  field SFColor color 1 0.843 0  # Gold color
+  field SFString name "coin"    # Add this line to declare the name field
+] {
+  Solid {
+    translation IS translation
+    rotation IS rotation
+    name IS name      # Connect the field to the Solid's name field
+    children [
+      Shape {
+        appearance Appearance {
+          material Material {
+            diffuseColor IS color
+            shininess 0.8
+          }
+        }
+        geometry Cylinder {
+          height 0.01
+          radius 0.045
+        }
+      }
+    ]
+    # Assign the DEF value directly from the def field
+    boundingObject NULL
+    physics NULL
+  }
+}

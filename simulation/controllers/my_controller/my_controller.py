@@ -1,9 +1,44 @@
 import numpy as np
 import random
 from collections import deque
+import math
+from controller import Supervisor
 
 random.seed(0)
 player_dict = {0:'X', 1:'Y'}
+supervisor = Supervisor()
+timestep = int(supervisor.getBasicTimeStep())
+arena = supervisor.getFromDef('arena')
+floor_size = arena.getField('floorSize').getSFVec2f()
+
+def get_x_y(row,column):
+    x_offset = 0.35
+    y_offset = -0.35
+    tile_size = 0.1
+
+    center_x = -floor_size[0] / 2 + x_offset
+    center_y = -floor_size[1] / 2 + y_offset
+    x = center_x + (column + 0.5) * tile_size
+    y = center_y + (7 - row + 0.5) * tile_size
+    return x,y
+
+def create_coin(supervisor, row, column):
+    x, y = get_x_y(row=row,column=column)  # Assume get_x_y is a function that calculates positions based on grid indices
+    # Create a unique DEF and name for each coin
+    coin_def = f"coin_{row}_{column}"
+
+    # Adjust the coin position and name for a different orientation or logic
+    coin_def_string = f'DEF {coin_def} Coin {{ translation {x} {y} 0.025 name "{coin_def}" }}'
+    root_node = supervisor.getRoot()
+    children_field = root_node.getField('children')
+    children_field.importMFNodeFromString(-1, coin_def_string)
+
+
+def remove_coin(supervisor, row, column):
+    coin_name = f"coin_{row}_{column}"
+    print(f"Removing coin {coin_name}")
+    coin_node = supervisor.getFromDef(coin_name)
+    coin_node.remove()
 
 class GameBoard:
     '''
@@ -20,15 +55,6 @@ class GameBoard:
             for col in range(size):
                 self.board[row, col] = random.randint(0, 1)  # Randomly place coins
                 
-    # def print_board(self, players):
-    #     display_board = np.copy(self.board).astype(str)
-    #     for num, player in enumerate(players):
-    #         row, col = player.position
-    #         display_board[row, col] = player_dict[num]  # Distinguish players on the board
-        
-    #     for row in display_board:
-    #         print(" ".join(row))
-    #     print()
 
     def print_board(self, players = []):
         '''
@@ -183,6 +209,13 @@ class Game:
         self.rounds = 0
         print("Initial Board:")
         self.board.print_board()
+
+        for row in range(self.board.size):
+            for col in range(self.board.size):
+                if self.board.board[row, col] == 1:
+                    create_coin(supervisor, row, col)
+    
+
     
     def play_game(self):
         '''
@@ -196,7 +229,8 @@ class Game:
             row, col = player.position
             if self.board.board[row, col] == 1:
                 player.score += 1
-                self.board.board[row, col] = 0 
+                self.board.board[row, col] = 0
+                remove_coin(supervisor, row = row, column= col)
 
         print("Game Start!")
         self.board.print_board(self.players)
@@ -212,6 +246,7 @@ class Game:
                 player.score += 1
                 player.consecutive_coins += 1
                 self.board.board[row, col] = 0
+                remove_coin(supervisor, row=row, column=col)
 
                 if player.consecutive_coins >=3: # Take in account the current coin streak and apply bonus accordingly
                     bonus = player.consecutive_coins ** 2
@@ -220,11 +255,11 @@ class Game:
             else:
                 player.consecutive_coins = 0
             print(f"Player {player_dict[player_index]} moved {move_dict[selected_move]}",f"({player.consecutive_coins} consecutive coin(s))" if player.consecutive_coins else "")
-
             self.board.print_board(self.players)
 
             player_index = 1 - player_index # Alternate between players
             self.rounds += 1
+            supervisor.step(timestep)
 
         self.summarize_game()
 

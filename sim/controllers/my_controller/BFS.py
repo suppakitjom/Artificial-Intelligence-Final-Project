@@ -1,9 +1,38 @@
 import numpy as np
 import random
 from collections import deque
+from controller import Supervisor
 
 random.seed(0)
 player_dict = {0:'X', 1:'Y'}
+supervisor = Supervisor()
+timestep = int(supervisor.getBasicTimeStep())
+arena = supervisor.getFromDef('arena')
+floor_size = arena.getField('floorSize').getSFVec2f()
+
+def get_x_y(i,j):
+    x_offset = 0.35
+    y_offset = -0.35
+    tile_size = 0.1
+
+    center_x = -floor_size[0] / 2 + x_offset
+    center_y = -floor_size[1] / 2 + y_offset
+    x = center_x + (j + 0.5) * tile_size
+    y = center_y + (7 - i + 0.5) * tile_size
+    return x,y
+
+def create_coin(supervisor, i, j):
+    x,y = get_x_y(i,j)
+    global coin_count
+    # Create a unique name for each coin
+    coin_name = f"coin_{i}_{j}"
+    
+    # Adjust the coin position and name for a different orientation or logic
+    coin_def_string = f'Coin {{ translation {x} {y} 0.025 name "{coin_name}" }}'
+    root_node = supervisor.getRoot()
+    children_field = root_node.getField('children')
+    children_field.importMFNodeFromString(-1, coin_def_string)
+
 
 class GameBoard:
     '''
@@ -183,6 +212,13 @@ class Game:
         self.rounds = 0
         print("Initial Board:")
         self.board.print_board()
+
+        for i in range(self.board.size):
+            for j in range(self.board.size):
+                if random.randint(0, 1) == 1:
+                    create_coin(supervisor, i, j)
+    
+
     
     def play_game(self):
         '''
