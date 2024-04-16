@@ -10,7 +10,8 @@ This project is a Python-based simulation of a 2-player game on an 8x8 board. Pl
 
 -   2-player game simulation
 -   8x8 board with coins
--   Game tree search for decision-making
+-   Game tree search for decision-making (Find Nearest Coin)
+-   Players cannot be in the same tile
 -   Bonus score for collecting coins in a row
 -   3D simulation using Webots to visualize the game
 
@@ -18,7 +19,7 @@ This project is a Python-based simulation of a 2-player game on an 8x8 board. Pl
 
 <center>
 
-[![Watch the video](https://img.youtube.com/vi/nGhL04Zr4N0E/0.jpg)](https://www.youtube.com/watch?v=nGhL04Zr4N0)
+[![Watch Video Demo](https://img.youtube.com/vi/nGhL04Zr4N0/0.jpg)](https://www.youtube.com/watch?v=nGhL04Zr4N0)
 
 </center>
 
