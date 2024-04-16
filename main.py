@@ -20,16 +20,6 @@ class GameBoard:
             for col in range(size):
                 self.board[row, col] = random.randint(0, 1)  # Randomly place coins
                 
-    # def print_board(self, players):
-    #     display_board = np.copy(self.board).astype(str)
-    #     for num, player in enumerate(players):
-    #         row, col = player.position
-    #         display_board[row, col] = player_dict[num]  # Distinguish players on the board
-        
-    #     for row in display_board:
-    #         print(" ".join(row))
-    #     print()
-
     def print_board(self, players = []):
         '''
         Print the game board with players and coins.

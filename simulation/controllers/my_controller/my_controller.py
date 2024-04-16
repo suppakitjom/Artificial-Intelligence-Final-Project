@@ -8,12 +8,22 @@ from controller import Supervisor
 player_dict = {0:'X', 1:'Y'}
 
 class Sim(Supervisor):
+    '''
+    Class to control the simulation environment.
+    Contains methods to create and remove coins, and move the robot on the board.
+    '''
     def __init__(self):
+        '''
+        Creates the supervisor instance
+        '''
         self.game = Supervisor()
         self.timestep = int(self.game.getBasicTimeStep())
         self.arena = self.game.getFromDef('arena')
 
     def get_x_y(self,row,column):
+        '''
+        Function to convert the row and column indices to x and y coordinates on the board.
+        '''
         x_offset = 0.35
         y_offset = -0.35
         tile_size = 0.1
@@ -26,6 +36,11 @@ class Sim(Supervisor):
         return x,y
 
     def create_coin(self,row,column):
+        '''
+        Function to spawn a coin on the board at a given row and column.
+        the coin is defined as a DEF node in the Webots world file.
+        the DEF name is coin_{row}_{column}
+        '''
         x, y = self.get_x_y(row=row,column=column)
         coin_def = f"coin_{row}_{column}"
         coin_def_string = f'DEF {coin_def} Coin {{ translation {x} {y} 0.025 name "{coin_def}" }}'
@@ -34,12 +49,19 @@ class Sim(Supervisor):
         children_field.importMFNodeFromString(-1, coin_def_string)
 
     def remove_coin(self,row,column):
+        '''
+        Function to remove a coin from the board at a given row and column.
+        '''
         coin_name = f"coin_{row}_{column}"
         print(f"Removing coin {coin_name}")
         coin_node = self.game.getFromDef(coin_name)
         coin_node.remove()
 
     def move_robot(self,robot_def,row,column,direction):
+        '''
+        Function to simulate the movement of the robot on the board.
+        The robot is moved to the given row and column and turned in the specified direction.
+        '''
         rotation = {'left':math.pi, 'right':0, 'up':math.pi/2, 'down':-math.pi/2}
         robot = self.game.getFromDef(robot_def)
         x, y = self.get_x_y(row=row,column=column)
@@ -220,6 +242,7 @@ class Game:
     def __init__(self):
         '''
         Initialize the game with a GameBoard and two Player objects spawned at each corner of the board.
+        Also initializes the simulation environment.
         '''
         self.board = GameBoard()
         self.players = [Player((0, 0)), Player((7, 7))]
