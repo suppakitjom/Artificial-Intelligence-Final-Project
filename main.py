@@ -100,6 +100,7 @@ class GameBoard:
         Every coin has a 50% chance to go transparent and be uncollectable,
         and every transparent coin has a 50% chance to go back to normal
         '''
+
         for row in range(self.size):
             for col in range(self.size):
                 if self.board[row, col] == 1:
@@ -218,7 +219,7 @@ class Game:
                 player.consecutive_coins += 1
                 self.board.board[row, col] = 0
 
-                if player.consecutive_coins >=3: # Take in account the current coin streak and apply bonus accordingly
+                if player.consecutive_coins >=3 : # Take in account the current coin streak and apply bonus accordingly
                     bonus = player.consecutive_coins ** 2
                     player.score += bonus - player.consecutive_coins 
                     print(f"Bonus! Player {player_dict[player_index]} collected {player.consecutive_coins} consecutive coins for a bonus of {bonus - player.consecutive_coins} points!")

@@ -4,6 +4,7 @@ from collections import deque
 
 random.seed(0)  # For reproducibility, can be removed for more varied outcomes
 player_dict = {0: 'X', 1: 'Y'}
+SEARCH_DEPTH = 3
 
 class GameBoard:
     def __init__(self, size=8, board=None):
@@ -88,6 +89,7 @@ class GameBoard:
         Every coin has a 50% chance to go transparent and be uncollectable,
         and every transparent coin has a 50% chance to go back to normal
         '''
+
         for row in range(self.size):
             for col in range(self.size):
                 if self.board[row, col] == 1:
@@ -121,28 +123,24 @@ class Game:
         self.players = [Player((0, 0)), Player((size - 1, size - 1))]
         self.player_index = 0  # Player X starts
         self.size = size
+        
+        print("Initial Board:")
+        self.board.print_board()  # Print the initial board state
+
+    def play_game(self):
+        rounds = 0
         # Recognize if an agent spawns on a coin and adjust scores accordingly
         for player in self.players:
             if self.board.board[player.position] == 1:
                 player.score += 1
-                self.board.board[player.position] = 0  # Remove the coin as it's collected
-        print("Initial Board:")
-        self.board.print_board(self.players)  # Print the initial board state
-
-    def play_game(self):
-        rounds = 0
-        for player in self.players: # Check if players are starting on coins
-            row, col = player.position
-            if self.board.board[row, col] == 1:
-                player.score += 1
                 player.consecutive_coins += 1
-                self.board.board[row, col] = 0 
+                self.board.board[player.position] = 0  # Remove the coin as it's collected
 
         move_dict = {(0, 1): 'right', (0, -1): 'left', (1, 0): 'down', (-1, 0): 'up'}
         while self.board.get_coins_left():
             self.board.transparent_coin()
             player = self.players[self.player_index]
-            best_score, best_move = self.minimax(depth=3, player_index=self.player_index, is_maximizing=True, alpha=-float('inf'), beta=float('inf'))
+            best_score, best_move = self.minimax(depth=SEARCH_DEPTH, player_index=self.player_index, is_maximizing=True, alpha=-float('inf'), beta=float('inf'), board=self.board, players=self.players)
             if best_move:
                 prev_score = player.score
                 self.apply_move(best_move, player)
@@ -179,23 +177,17 @@ class Game:
         if best_move:
             self.apply_move(best_move, self.players[self.player_index])
 
-    def minimax(self, depth, player_index, is_maximizing, alpha, beta):
-        if depth == 0 or self.board.get_coins_left() == 0:
-            return self.evaluate(player_index,self.board), None
-        
-        for move in self.players[player_index].get_valid_moves(self.board, self.players):
-            if self.board.board[self.players[player_index].position[0] + move[0],
-                                self.players[player_index].position[1] + move[1]] == 1:
-                # Assign a high score for immediate coin collection
-                return (float('inf'), move) if is_maximizing else (-float('inf'), move)
+    def minimax(self, depth, player_index, is_maximizing, alpha, beta, board, players):
+        if depth == 0 or board.get_coins_left() == 0:
+            return self.evaluate(player_index, board), None
         
         best_move = None
         if is_maximizing:
             max_eval = -float('inf')
             equal_moves = []
-            for move in self.players[player_index].get_valid_moves(self.board,self.players):
-                new_board, new_player = self.simulate_move(move, player_index)
-                evaluation = self.minimax(depth - 1, 1 - player_index, False, alpha, beta)[0]
+            for move in players[player_index].get_valid_moves(board, players):
+                new_board, new_players = self.simulate_move(move, player_index, board, players)
+                evaluation, _ = self.minimax(depth - 1, 1 - player_index, False, alpha, beta, new_board, new_players)
                 if evaluation > max_eval:
                     max_eval = evaluation
                     equal_moves = [move]
@@ -208,9 +200,9 @@ class Game:
             return max_eval, best_move
         else:
             min_eval = float('inf')
-            for move in self.players[player_index].get_valid_moves(self.board,self.players):
-                new_board, new_player = self.simulate_move(move, player_index)
-                evaluation = self.minimax(depth - 1, 1 - player_index, True, alpha, beta)[0]
+            for move in players[player_index].get_valid_moves(board, players):
+                new_board, new_players = self.simulate_move(move, player_index, board, players)
+                evaluation, _ = self.minimax(depth - 1, 1 - player_index, True, alpha, beta, new_board, new_players)
                 if evaluation < min_eval:
                     min_eval = evaluation
                     best_move = move
@@ -242,12 +234,30 @@ class Game:
         return score_diff + proximity_advantage
 
 
-    def simulate_move(self, move, player_index):
-        # Simulate a move without affecting the current game state
-        new_board = GameBoard(self.size, self.board.board)
-        new_player = Player(self.players[player_index].position, self.players[player_index].score)
-        self.apply_move(move, new_player, new_board)
-        return new_board, new_player
+    def simulate_move(self, move, player_index, board, players):
+        # Clone the board
+        new_board = GameBoard(board.size, board.board)
+        
+        # Deep copy the players to prevent state leakage
+        new_players = [Player(p.position, p.score) for p in players]
+        new_player = new_players[player_index]
+        
+        # Apply the move
+        new_position = (new_player.position[0] + move[0], new_player.position[1] + move[1])
+        new_player.position = new_position
+        if new_board.board[new_position] == 1:
+            new_player.score += 1
+            new_player.consecutive_coins += 1
+            new_board.board[new_position] = 0
+            if new_player.consecutive_coins >= 3:
+                bonus = new_player.consecutive_coins ** 2
+                new_player.score += bonus - new_player.consecutive_coins
+        else:
+            new_player.consecutive_coins = 0
+        
+        return new_board, new_players
+
+
 
     def apply_move(self, move, player, board=None):
         if board is None:
@@ -258,11 +268,12 @@ class Game:
             player.score += 1
             player.consecutive_coins += 1
             board.board[new_position] = 0
-            if player.consecutive_coins >=3: # Take in account the current coin streak and apply bonus accordingly
-                    bonus = player.consecutive_coins ** 2
-                    player.score += bonus - player.consecutive_coins 
+            if player.consecutive_coins >= 3:
+                bonus = player.consecutive_coins ** 2
+                player.score += bonus
         else:
             player.consecutive_coins = 0
+
 
 
 game = Game(size=8)
