@@ -55,7 +55,6 @@ class GameBoard:
             print(f"Player Y score: {players[1].score}")
         print()
 
-
     def is_move_valid(self, row, col, players):
         '''
         Takes input of row and column and a list of Player objects.
@@ -69,7 +68,7 @@ class GameBoard:
         '''
         Returns the number of coins left on the board.
         '''
-        return np.sum(self.board)
+        return np.sum(self.board != 0)
     
     def nearest_coin_distance(self, position, players):
         '''
@@ -94,8 +93,8 @@ class GameBoard:
                     new_row, new_col = current_row + dr, current_col + dc
                     if self.is_move_valid(new_row, new_col, players):
                         queue.append(((new_row, new_col), distance + 1))
-        return float('inf')
-    
+        return -float('inf')
+
     def transparent_coin(self):
         '''
         Every coin has a 50% chance to go transparent and be uncollectable,
@@ -142,7 +141,7 @@ class Player:
         '''
         valid_moves = self.get_valid_moves(board, players)
 
-        best_score = -float('inf')
+        best_distance = float('inf')
         best_move = None
         current_position = np.array(self.position)
 
@@ -151,25 +150,22 @@ class Player:
 
             # Check if the move results in immediate scoring
             if board.board[new_position] == 1:
-                score = float('inf')
+                distance = 0
             else:
                 # Calculate the distance to the nearest coin after the move
-                distance_to_coin = board.nearest_coin_distance(new_position,players)
-                # Score prioritizes moves with shorter distances to coins
-                score = 1 / (distance_to_coin + 1)  # Add 1 to avoid division by zero
+                distance = board.nearest_coin_distance(new_position, players)
 
-            # Prioritize moves with higher scores
-            if score > best_score:
-                best_score = score
+            # Prioritize moves with shorter distances
+            if distance < best_distance:
+                best_distance = distance
                 best_move = move
+        return best_move, best_distance
 
-        return best_move
-
-    def move(self, board, players):
+    def move(self, board, players, player_index):
         '''
         Makes a move for the player on the board based on the evaluation of valid moves.
         '''
-        best_move = self.evaluate_moves(board, players)
+        best_move,best_distance = self.evaluate_moves(board, players)
         if best_move:
             self.position = tuple(np.array(self.position) + best_move)
             return best_move
@@ -203,6 +199,7 @@ class Game:
             row, col = player.position
             if self.board.board[row, col] == 1:
                 player.score += 1
+                player.consecutive_coins += 1
                 self.board.board[row, col] = 0 
 
         print("Game Start!")
@@ -213,7 +210,7 @@ class Game:
         while self.board.get_coins_left():  # Continue until all coins are 
             self.board.transparent_coin()
             player = self.players[player_index]
-            selected_move = player.move(self.board, self.players)
+            selected_move = player.move(self.board, self.players, player_index)
 
             row, col = player.position
             if self.board.board[row, col] == 1:
