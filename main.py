@@ -27,7 +27,8 @@ class GameBoard:
         '''
         # Define symbols for readability
         empty_cell_symbol = " "
-        coin_cell_symbol = "o"
+        coin_cell_symbol = "●"
+        transparent_coin_symbol = "○"
         
         display_board = np.full((self.size, self.size), empty_cell_symbol, dtype=str)
         # Mark coins on the display board
@@ -35,6 +36,8 @@ class GameBoard:
             for col in range(self.size):
                 if self.board[row, col] == 1:
                     display_board[row, col] = coin_cell_symbol
+                elif self.board[row, col] == 2:
+                    display_board[row, col] = transparent_coin_symbol
                     
         # Place players on the board
         for num, player in enumerate(players):
@@ -93,6 +96,20 @@ class GameBoard:
                         queue.append(((new_row, new_col), distance + 1))
         return float('inf')
     
+    def transparent_coin(self):
+        '''
+        Every coin has a 50% chance to go transparent and be uncollectable,
+        and every transparent coin has a 50% chance to go back to normal
+        '''
+        for row in range(self.size):
+            for col in range(self.size):
+                if self.board[row, col] == 1:
+                    if random.random() < 0.5:
+                        self.board[row, col] = 2
+                elif self.board[row, col] == 2:
+                    if random.random() < 0.5:
+                        self.board[row, col] = 1
+
 class Player:
     '''
     Class to represent a player in the game.
@@ -192,8 +209,9 @@ class Game:
         self.board.print_board(self.players)
 
         player_index = 0
-
-        while self.board.get_coins_left():  # Continue until all coins are collected
+        
+        while self.board.get_coins_left():  # Continue until all coins are 
+            self.board.transparent_coin()
             player = self.players[player_index]
             selected_move = player.move(self.board, self.players)
 
