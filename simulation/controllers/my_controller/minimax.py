@@ -1,10 +1,96 @@
 import numpy as np
 import random
 from collections import deque
+import math
+from controller import Supervisor
 
 random.seed(0)  # For reproducibility, can be removed for more varied outcomes
 player_dict = {0: 'X', 1: 'Y'}
 SEARCH_DEPTH = 3
+
+class Sim(Supervisor):
+    '''
+    Class to control the simulation environment.
+    Contains methods to create and remove coins, and move the robot on the board.
+    '''
+    def __init__(self):
+        '''
+        Creates the supervisor instance
+        '''
+        self.game = Supervisor()
+        self.timestep = int(self.game.getBasicTimeStep())
+        self.arena = self.game.getFromDef('arena')
+
+    def get_x_y(self,row,column):
+        '''
+        Function to convert the row and column indices to x and y coordinates on the board.
+        '''
+        x_offset = 0.35
+        y_offset = -0.35
+        tile_size = 0.1
+        floor_size = self.arena.getField('floorSize').getSFVec2f()
+
+        center_x = -floor_size[0] / 2 + x_offset
+        center_y = -floor_size[1] / 2 + y_offset
+        x = center_x + (column + 0.5) * tile_size
+        y = center_y + (7 - row + 0.5) * tile_size
+        return x,y
+
+    def create_coin(self,row,column):
+        '''
+        Function to spawn a coin on the board at a given row and column.
+        the coin is defined as a DEF node in the Webots world file.
+        the DEF name is coin_{row}_{column}
+        '''
+        x, y = self.get_x_y(row=row,column=column)
+        coin_def = f"coin_{row}_{column}"
+        coin_def_string = f'DEF {coin_def} Coin {{ translation {x} {y} 0.025 name "{coin_def}" }}'
+        root_node = self.game.getRoot()
+        children_field = root_node.getField('children')
+        children_field.importMFNodeFromString(-1, coin_def_string)
+
+    def remove_coin(self,row,column):
+        '''
+        Function to remove a coin from the board at a given row and column.
+        '''
+        coin_name = f"coin_{row}_{column}"
+        print(f"Removing coin {coin_name}")
+        coin_node = self.game.getFromDef(coin_name)
+        coin_node.remove()
+
+    def set_coin_transparency(self,row,column,state):
+        '''set color to black if state = 2, yellow if 1'''
+        coin_name = f"coin_{row}_{column}"
+        coin_node = self.game.getFromDef(coin_name)
+        coin_color = coin_node.getField('color')
+        if state == 1:
+            coin_color.setSFColor([1, .823, 0])
+        elif state == 2:
+            coin_color.setSFColor([0, 0, 0])
+        pass 
+
+    def move_robot(self,robot_def,row,column,direction):
+        '''
+        Function to simulate the movement of the robot on the board.
+        The robot is moved to the given row and column and turned in the specified direction.
+        '''
+        rotation = {'left':math.pi, 'right':0, 'up':math.pi/2, 'down':-math.pi/2}
+        robot = self.game.getFromDef(robot_def)
+        x, y = self.get_x_y(row=row,column=column)
+        # turn the robot to the correct direction
+        rotation_field = robot.getField('rotation')
+        rotation_field.setSFRotation([0, 0, 1, rotation[direction]])
+
+        translation_field = robot.getField('translation')
+        current_position = translation_field.getSFVec3f()
+        target_position = [x, y, 0]
+        num_iterations = 15
+        step_size = [(target_position[i] - current_position[i]) / num_iterations for i in range(3)]
+        for _ in range(num_iterations):
+            current_position = [current_position[i] + step_size[i] for i in range(3)]
+            translation_field.setSFVec3f(current_position)
+            self.game.step(self.timestep)
+
 
 class GameBoard:
     def __init__(self, size=8, board=None):
@@ -90,7 +176,7 @@ class GameBoard:
             return not any(player.position == (row, col) for player in players)
         return False
 
-    def transparent_coin(self):
+    def transparent_coin(self,supervisor):
         '''
         Every coin has a 50% chance to go transparent and be uncollectable,
         and every transparent coin has a 50% chance to go back to normal
@@ -101,9 +187,11 @@ class GameBoard:
                 if self.board[row, col] == 1:
                     if random.random() < 0.5:
                         self.board[row, col] = 2
+                        supervisor.set_coin_transparency(row=row,column=col, state= self.board[row, col])
                 elif self.board[row, col] == 2:
                     if random.random() < 0.5:
                         self.board[row, col] = 1
+                        supervisor.set_coin_transparency(row=row,column=col, state= self.board[row, col])
 
 class Player:
     def __init__(self, start_position, score=0):
@@ -127,11 +215,17 @@ class Game:
     def __init__(self, size=8):
         self.board = GameBoard(size)
         self.players = [Player((0, 0)), Player((size - 1, size - 1))]
+        self.sim = Sim()
         self.player_index = 0  # Player X starts
         self.size = size
         
         print("Initial Board:")
         self.board.print_board()  # Print the initial board state
+
+        for row in range(self.board.size):
+            for col in range(self.board.size):
+                if self.board.board[row, col] == 1:
+                    self.sim.create_coin(row=row,column=col)
 
     def play_game(self):
         rounds = 0
@@ -141,15 +235,19 @@ class Game:
                 player.score += 1
                 player.consecutive_coins += 1
                 self.board.board[player.position] = 0  # Remove the coin as it's collected
+                row, col = player.position
+                self.sim.remove_coin(row=row,column=col)
 
         move_dict = {(0, 1): 'right', (0, -1): 'left', (1, 0): 'down', (-1, 0): 'up'}
         while self.board.get_coins_left():
-            self.board.transparent_coin()
+            self.board.transparent_coin(self.sim)
             player = self.players[self.player_index]
             best_score, best_move = self.minimax(depth=SEARCH_DEPTH, player_index=self.player_index, is_maximizing=True, alpha=-float('inf'), beta=float('inf'), board=self.board, players=self.players)
             if best_move:
                 prev_score = player.score
                 self.apply_move(best_move, player)
+                row, col = player.position
+                self.sim.move_robot(robot_def=f'player{self.player_index+1}',row=row,column=col,direction=move_dict[best_move])
                 rounds += 1
                 # Print each move
                 print(f"Round {rounds}: Player {player_dict[self.player_index]} moves {move_dict[best_move]}.", end=" ")
@@ -271,6 +369,7 @@ class Game:
             player.score += 1
             player.consecutive_coins += 1
             board.board[new_position] = 0
+            self.sim.remove_coin(row=new_position[0],column=new_position[1])
             if player.consecutive_coins >= 3:
                 bonus = player.consecutive_coins ** 2
                 player.score += bonus

@@ -53,9 +53,15 @@ class GameBoard:
         print()
     
     def get_coins_left(self):
+        '''
+        Count the number of coins left on the board.
+        '''
         return np.sum(self.board != 0)
     
     def nearest_coin_distance(self, start_pos):
+        '''
+        Find the distance to the nearest coin from a given position using BFS.
+        '''
         if self.board[start_pos] == 1:
             return 0  # Standing on a coin
         
@@ -73,8 +79,8 @@ class GameBoard:
                         return distance + 1
                     queue.append((next_pos, distance + 1))
                     visited.add(next_pos)
-        return float('inf')  # In case no coins are found
-    
+        return -float('inf')  # In case no coins are found
+
     def is_move_valid(self, row, col, players):
         """
         Check if a move is valid: inside the board and not occupied by another player.
@@ -107,7 +113,7 @@ class Player:
 
     def get_valid_moves(self, board, players):
         """
-        Only return moves that do not result in collisions.
+        Only return moves within the board that do not result in collisions.
         """
         valid_moves = []
         directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Right, left, down, up
@@ -233,7 +239,6 @@ class Game:
         # You might need to adjust the weights to find what works best for your game.
         return score_diff + proximity_advantage
 
-
     def simulate_move(self, move, player_index, board, players):
         # Clone the board
         new_board = GameBoard(board.size, board.board)
@@ -257,8 +262,6 @@ class Game:
         
         return new_board, new_players
 
-
-
     def apply_move(self, move, player, board=None):
         if board is None:
             board = self.board
@@ -273,8 +276,6 @@ class Game:
                 player.score += bonus
         else:
             player.consecutive_coins = 0
-
-
 
 game = Game(size=8)
 game.play_game()
