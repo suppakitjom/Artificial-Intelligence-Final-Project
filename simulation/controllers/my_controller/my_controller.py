@@ -1,4 +1,4 @@
-MINIMAX = 1
+MINIMAX = 0
 
 if MINIMAX:
     from minimax import Game

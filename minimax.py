@@ -2,33 +2,36 @@ import numpy as np
 import random
 from collections import deque
 
-random.seed(0)  # For reproducibility, can be removed for more varied outcomes
+random.seed(0)
 player_dict = {0: 'X', 1: 'Y'}
 SEARCH_DEPTH = 3
 
 class GameBoard:
+    '''
+    Class to represent the game board.
+    Contains methods to initialize the board, print the board, check move validity, and find the nearest coin.
+    '''
     def __init__(self, size=8, board=None):
         self.size = size
         if board is None:
             self.board = np.zeros((size, size), dtype=int)
             for row in range(size):
                 for col in range(size):
-                    self.board[row, col] = random.randint(0, 1)  # Randomly place coins
+                    self.board[row, col] = random.randint(0, 1)
         else:
-            self.board = np.copy(board)  # Use an existing board state
+            self.board = np.copy(board)
 
     def print_board(self, players = []):
         '''
         Print the game board with players and coins.
         Takes an optional list of Player objects to display player positions and scores.
         '''
-        # Define symbols for readability
         empty_cell_symbol = " "
         coin_cell_symbol = "●"
         transparent_coin_symbol = "○"
         
         display_board = np.full((self.size, self.size), empty_cell_symbol, dtype=str)
-        # Mark coins on the display board
+        
         for row in range(self.size):
             for col in range(self.size):
                 if self.board[row, col] == 1:
@@ -36,7 +39,7 @@ class GameBoard:
                 elif self.board[row, col] == 2:
                     display_board[row, col] = transparent_coin_symbol
                     
-        # Place players on the board
+
         for num, player in enumerate(players):
             row, col = player.position
             display_board[row, col] = player_dict[num]
@@ -46,6 +49,7 @@ class GameBoard:
             row_str = "| " + " | ".join(row) + " |\n"
             board_str += row_str + "+" + "---+" * self.size + "\n"
         print(board_str,end='')
+        
         if players:
             print(f"Coins left: {self.get_coins_left()}")
             print(f"Player X score: {players[0].score}")
@@ -63,9 +67,9 @@ class GameBoard:
         Find the distance to the nearest coin from a given position using BFS.
         '''
         if self.board[start_pos] == 1:
-            return 0  # Standing on a coin
+            return 0
         
-        directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]  # Down, Up, Right, Left
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Right, left, down, up
         visited = set([start_pos])
         queue = deque([(start_pos, 0)])  # (position, distance)
         
@@ -79,14 +83,14 @@ class GameBoard:
                         return distance + 1
                     queue.append((next_pos, distance + 1))
                     visited.add(next_pos)
-        return -float('inf')  # In case no coins are found
+        
+        return -float('inf')
 
     def is_move_valid(self, row, col, players):
         """
         Check if a move is valid: inside the board and not occupied by another player.
         """
         if 0 <= row < self.size and 0 <= col < self.size:
-            # Ensure no player is at the new position
             return not any(player.position == (row, col) for player in players)
         return False
 
@@ -106,15 +110,17 @@ class GameBoard:
                         self.board[row, col] = 1
 
 class Player:
+    '''
+    Class to represent a player.
+    Stores each player's position, score, and the number of coins they collected consecutively for each turn.
+    Contains method to get valid moves for the player.
+    '''
     def __init__(self, start_position, score=0):
         self.position = start_position
         self.score = score
         self.consecutive_coins = 0  
 
     def get_valid_moves(self, board, players):
-        """
-        Only return moves within the board that do not result in collisions.
-        """
         valid_moves = []
         directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Right, left, down, up
         for dr, dc in directions:
@@ -135,12 +141,12 @@ class Game:
 
     def play_game(self):
         rounds = 0
-        # Recognize if an agent spawns on a coin and adjust scores accordingly
-        for player in self.players:
+
+        for player in self.players: # For players spawning on coin
             if self.board.board[player.position] == 1:
                 player.score += 1
                 player.consecutive_coins += 1
-                self.board.board[player.position] = 0  # Remove the coin as it's collected
+                self.board.board[player.position] = 0
 
         move_dict = {(0, 1): 'right', (0, -1): 'left', (1, 0): 'down', (-1, 0): 'up'}
         while self.board.get_coins_left():
@@ -151,7 +157,6 @@ class Game:
                 prev_score = player.score
                 self.apply_move(best_move, player)
                 rounds += 1
-                # Print each move
                 print(f"Round {rounds}: Player {player_dict[self.player_index]} moves {move_dict[best_move]}.", end=" ")
                 if player.score > prev_score:
                     print(f"Collected a coin! Total score: {player.score}.", end=" ")
@@ -162,11 +167,10 @@ class Game:
                 print("\nBoard after move:")
                 self.board.print_board(self.players)
             self.player_index = 1 - self.player_index  # Switch players
-
-        # Summarize game results at the end
+        
         self.summarize_game(rounds)
 
-    # Final scores and winner announcement
+
     def summarize_game(self, rounds):
         print(f"\nFinal Scores after {rounds} rounds:")
         scores = [(player.score, idx) for idx, player in enumerate(self.players)]
@@ -178,7 +182,7 @@ class Game:
         else:
             print(f"Player {player_dict[scores[0][1]]} wins!")
 
-    def minimax_move(self, depth=5):
+    def minimax_move(self, depth=3):
         best_score, best_move = self.minimax(depth, self.player_index, True, -float('inf'), float('inf'))
         if best_move:
             self.apply_move(best_move, self.players[self.player_index])
@@ -221,33 +225,24 @@ class Game:
         player = self.players[player_index]
         opponent = self.players[1 - player_index]
 
-        # Score difference is crucial but should not be the only factor.
         score_diff = player.score - opponent.score
 
-        # Calculate the nearest coin distance for both players and prefer smaller distances.
         player_dist = board.nearest_coin_distance(player.position)
         opponent_dist = board.nearest_coin_distance(opponent.position)
 
-        # Inverting the distance so that smaller distances are better.
-        # Adding a small constant to prevent division by zero.
         player_advantage = 1 / (player_dist + 0.1)
         opponent_advantage = 1 / (opponent_dist + 0.1)
 
-        # Calculating the net advantage.
         proximity_advantage = player_advantage - opponent_advantage
 
-        # You might need to adjust the weights to find what works best for your game.
         return score_diff + proximity_advantage
 
     def simulate_move(self, move, player_index, board, players):
-        # Clone the board
-        new_board = GameBoard(board.size, board.board)
         
-        # Deep copy the players to prevent state leakage
+        new_board = GameBoard(board.size, board.board)
         new_players = [Player(p.position, p.score) for p in players]
         new_player = new_players[player_index]
-        
-        # Apply the move
+
         new_position = (new_player.position[0] + move[0], new_player.position[1] + move[1])
         new_player.position = new_position
         if new_board.board[new_position] == 1:
@@ -255,7 +250,7 @@ class Game:
             new_player.consecutive_coins += 1
             new_board.board[new_position] = 0
             if new_player.consecutive_coins >= 3:
-                bonus = new_player.consecutive_coins ** 2
+                bonus = new_player.consecutive_coins ** 2 
                 new_player.score += bonus - new_player.consecutive_coins
         else:
             new_player.consecutive_coins = 0
@@ -273,7 +268,7 @@ class Game:
             board.board[new_position] = 0
             if player.consecutive_coins >= 3:
                 bonus = player.consecutive_coins ** 2
-                player.score += bonus
+                player.score += bonus - player.consecutive_coins
         else:
             player.consecutive_coins = 0
 
