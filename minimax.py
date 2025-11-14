@@ -1,4 +1,3 @@
-import numpy as np
 import random
 from collections import deque
 
@@ -14,12 +13,12 @@ class GameBoard:
     def __init__(self, size=8, board=None):
         self.size = size
         if board is None:
-            self.board = np.zeros((size, size), dtype=int)
-            for row in range(size):
-                for col in range(size):
-                    self.board[row, col] = random.randint(0, 1)
+            self.board = [
+                [random.randint(0, 1) for _ in range(size)]
+                for _ in range(size)
+            ]
         else:
-            self.board = np.copy(board)
+            self.board = [row[:] for row in board]
 
     def print_board(self, players = []):
         '''
@@ -30,19 +29,22 @@ class GameBoard:
         coin_cell_symbol = "●"
         transparent_coin_symbol = "○"
         
-        display_board = np.full((self.size, self.size), empty_cell_symbol, dtype=str)
-        
+        display_board = [
+            [empty_cell_symbol for _ in range(self.size)]
+            for _ in range(self.size)
+        ]
+
         for row in range(self.size):
             for col in range(self.size):
-                if self.board[row, col] == 1:
-                    display_board[row, col] = coin_cell_symbol
-                elif self.board[row, col] == 2:
-                    display_board[row, col] = transparent_coin_symbol
+                if self.board[row][col] == 1:
+                    display_board[row][col] = coin_cell_symbol
+                elif self.board[row][col] == 2:
+                    display_board[row][col] = transparent_coin_symbol
                     
 
         for num, player in enumerate(players):
             row, col = player.position
-            display_board[row, col] = player_dict[num]
+            display_board[row][col] = player_dict[num]
     
         board_str = "+" + "---+" * self.size + "\n"
         for row in display_board:
@@ -60,13 +62,13 @@ class GameBoard:
         '''
         Count the number of coins left on the board.
         '''
-        return np.sum(self.board != 0)
+        return sum(cell != 0 for row in self.board for cell in row)
     
     def nearest_coin_distance(self, start_pos):
         '''
         Find the distance to the nearest coin from a given position using BFS.
         '''
-        if self.board[start_pos] == 1:
+        if self.board[start_pos[0]][start_pos[1]] == 1:
             return 0
         
         directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # Right, left, down, up
@@ -79,7 +81,7 @@ class GameBoard:
                 next_pos = (current_pos[0] + direction[0], current_pos[1] + direction[1])
                 if (0 <= next_pos[0] < self.size and 0 <= next_pos[1] < self.size
                         and next_pos not in visited):
-                    if self.board[next_pos] == 1:
+                    if self.board[next_pos[0]][next_pos[1]] == 1:
                         return distance + 1
                     queue.append((next_pos, distance + 1))
                     visited.add(next_pos)
@@ -102,12 +104,12 @@ class GameBoard:
 
         for row in range(self.size):
             for col in range(self.size):
-                if self.board[row, col] == 1:
+                if self.board[row][col] == 1:
                     if random.random() < 0.5:
-                        self.board[row, col] = 2
-                elif self.board[row, col] == 2:
+                        self.board[row][col] = 2
+                elif self.board[row][col] == 2:
                     if random.random() < 0.5:
-                        self.board[row, col] = 1
+                        self.board[row][col] = 1
 
 class Player:
     '''
@@ -115,10 +117,10 @@ class Player:
     Stores each player's position, score, and the number of coins they collected consecutively for each turn.
     Contains method to get valid moves for the player.
     '''
-    def __init__(self, start_position, score=0):
+    def __init__(self, start_position, score=0, consecutive_coins=0):
         self.position = start_position
         self.score = score
-        self.consecutive_coins = 0  
+        self.consecutive_coins = consecutive_coins
 
     def get_valid_moves(self, board, players):
         valid_moves = []
@@ -143,16 +145,25 @@ class Game:
         rounds = 0
 
         for player in self.players: # For players spawning on coin
-            if self.board.board[player.position] == 1:
+            if self.board.board[player.position[0]][player.position[1]] == 1:
                 player.score += 1
                 player.consecutive_coins += 1
-                self.board.board[player.position] = 0
+                self.board.board[player.position[0]][player.position[1]] = 0
 
         move_dict = {(0, 1): 'right', (0, -1): 'left', (1, 0): 'down', (-1, 0): 'up'}
         while self.board.get_coins_left():
             self.board.transparent_coin()
             player = self.players[self.player_index]
-            best_score, best_move = self.minimax(depth=SEARCH_DEPTH, player_index=self.player_index, is_maximizing=True, alpha=-float('inf'), beta=float('inf'), board=self.board, players=self.players)
+            best_score, best_move = self.minimax(
+                depth=SEARCH_DEPTH,
+                player_index=self.player_index,
+                is_maximizing=True,
+                alpha=-float('inf'),
+                beta=float('inf'),
+                board=self.board,
+                players=self.players,
+                maximizing_player_index=self.player_index,
+            )
             if best_move:
                 prev_score = player.score
                 self.apply_move(best_move, player)
@@ -183,21 +194,33 @@ class Game:
             print(f"Player {player_dict[scores[0][1]]} wins!")
 
     def minimax_move(self, depth=3):
-        best_score, best_move = self.minimax(depth, self.player_index, True, -float('inf'), float('inf'))
+        best_score, best_move = self.minimax(
+            depth,
+            self.player_index,
+            True,
+            -float('inf'),
+            float('inf'),
+            self.board,
+            self.players,
+            self.player_index,
+        )
         if best_move:
             self.apply_move(best_move, self.players[self.player_index])
 
-    def minimax(self, depth, player_index, is_maximizing, alpha, beta, board, players):
+    def minimax(self, depth, player_index, is_maximizing, alpha, beta, board, players, maximizing_player_index):
         if depth == 0 or board.get_coins_left() == 0:
-            return self.evaluate(player_index, board), None
+            return self.evaluate(board, players, maximizing_player_index), None
         
         best_move = None
         if is_maximizing:
             max_eval = -float('inf')
             equal_moves = []
-            for move in players[player_index].get_valid_moves(board, players):
+            moves = players[player_index].get_valid_moves(board, players)
+            if not moves:
+                return self.evaluate(board, players, maximizing_player_index), None
+            for move in moves:
                 new_board, new_players = self.simulate_move(move, player_index, board, players)
-                evaluation, _ = self.minimax(depth - 1, 1 - player_index, False, alpha, beta, new_board, new_players)
+                evaluation, _ = self.minimax(depth - 1, 1 - player_index, False, alpha, beta, new_board, new_players, maximizing_player_index)
                 if evaluation > max_eval:
                     max_eval = evaluation
                     equal_moves = [move]
@@ -210,9 +233,12 @@ class Game:
             return max_eval, best_move
         else:
             min_eval = float('inf')
-            for move in players[player_index].get_valid_moves(board, players):
+            moves = players[player_index].get_valid_moves(board, players)
+            if not moves:
+                return self.evaluate(board, players, maximizing_player_index), None
+            for move in moves:
                 new_board, new_players = self.simulate_move(move, player_index, board, players)
-                evaluation, _ = self.minimax(depth - 1, 1 - player_index, True, alpha, beta, new_board, new_players)
+                evaluation, _ = self.minimax(depth - 1, 1 - player_index, True, alpha, beta, new_board, new_players, maximizing_player_index)
                 if evaluation < min_eval:
                     min_eval = evaluation
                     best_move = move
@@ -221,36 +247,38 @@ class Game:
                     break
             return min_eval, best_move
 
-    def evaluate(self, player_index, board):
-        player = self.players[player_index]
-        opponent = self.players[1 - player_index]
+    def evaluate(self, board, players, maximizing_player_index):
+        player = players[maximizing_player_index]
+        opponent = players[1 - maximizing_player_index]
 
         score_diff = player.score - opponent.score
 
         player_dist = board.nearest_coin_distance(player.position)
         opponent_dist = board.nearest_coin_distance(opponent.position)
 
-        player_advantage = 1 / (player_dist + 0.1)
-        opponent_advantage = 1 / (opponent_dist + 0.1)
+        def distance_value(distance):
+            if distance == -float('inf'):
+                return 0
+            return 1 / (distance + 1)
 
-        proximity_advantage = player_advantage - opponent_advantage
+        proximity_advantage = distance_value(player_dist) - distance_value(opponent_dist)
 
         return score_diff + proximity_advantage
 
     def simulate_move(self, move, player_index, board, players):
         
         new_board = GameBoard(board.size, board.board)
-        new_players = [Player(p.position, p.score) for p in players]
+        new_players = [Player(p.position, p.score, p.consecutive_coins) for p in players]
         new_player = new_players[player_index]
 
         new_position = (new_player.position[0] + move[0], new_player.position[1] + move[1])
         new_player.position = new_position
-        if new_board.board[new_position] == 1:
+        if new_board.board[new_position[0]][new_position[1]] == 1:
             new_player.score += 1
             new_player.consecutive_coins += 1
-            new_board.board[new_position] = 0
+            new_board.board[new_position[0]][new_position[1]] = 0
             if new_player.consecutive_coins >= 3:
-                bonus = new_player.consecutive_coins ** 2 
+                bonus = new_player.consecutive_coins ** 2
                 new_player.score += bonus - new_player.consecutive_coins
         else:
             new_player.consecutive_coins = 0
@@ -262,10 +290,10 @@ class Game:
             board = self.board
         new_position = (player.position[0] + move[0], player.position[1] + move[1])
         player.position = new_position
-        if board.board[new_position] == 1:
+        if board.board[new_position[0]][new_position[1]] == 1:
             player.score += 1
             player.consecutive_coins += 1
-            board.board[new_position] = 0
+            board.board[new_position[0]][new_position[1]] = 0
             if player.consecutive_coins >= 3:
                 bonus = player.consecutive_coins ** 2
                 player.score += bonus - player.consecutive_coins
